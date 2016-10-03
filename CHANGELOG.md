@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.12.1 (2016-09-29)
+
+* Enchancements
+  * Support special "char" type
+
+* Bug fixes
+  * Limit re-bootstrap to one connection at a time
+  * Fix re-bootstrap of new composite types that use old types
+
+## v0.12.0 (2016-09-06)
+
+* Enhancements
+  * Raise DBConnection.ConnectionError on connection error
+  * Use send encoding to determine citext encoding
+  * Use Map in favor of deprecated modules (to avoid warnings on v1.4)
+  * Run rebootstrap test synchronously on every connect
+  * Add support for Elixir 1.3+ Calendar types
+
 ## v0.11.2 (2016-06-16)
 
 * Enhancements

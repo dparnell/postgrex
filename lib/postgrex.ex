@@ -34,7 +34,7 @@ defmodule Postgrex do
 
     * `:hostname` - Server hostname (default: PGHOST env variable, then localhost);
     * `:port` - Server port (default: PGPORT env variable, then 5432);
-    * `:database` - Database (required);
+    * `:database` - Database (default: PGDATABASE env variable; otherwise required);
     * `:username` - Username (default: PGUSER env variable, then USER env var);
     * `:password` - User password (default PGPASSWORD);
     * `:parameters` - Keyword list of connection parameters;
@@ -73,11 +73,15 @@ defmodule Postgrex do
 
   @doc """
   Runs an (extended) query and returns the result as `{:ok, %Postgrex.Result{}}`
-  or `{:error, %Postgrex.Error{}}` if there was an error. Parameters can be
-  set in the query as `$1` embedded in the query string. Parameters are given as
-  a list of elixir values. See the README for information on how Postgrex
+  or `{:error, %Postgrex.Error{}}` if there was a database error. Parameters can
+  be set in the query as `$1` embedded in the query string. Parameters are given
+  as a list of elixir values. See the README for information on how Postgrex
   encodes and decodes Elixir values by default. See `Postgrex.Result` for the
   result data.
+
+  This function may still raise an exception if there is an issue with types
+  (`ArgumentError`), connection (`DBConnection.ConnectionError`), ownership
+  (`DBConnection.OwnershipError`) or other error (`RuntimeError`).
 
   ## Options
 
@@ -121,12 +125,10 @@ defmodule Postgrex do
     case DBConnection.prepare_execute(conn, query, params, opts) do
       {:ok, _, result} ->
         {:ok, result}
-      {:error, %ArgumentError{} = err} ->
-        raise err
-      {:error, %RuntimeError{} = err} ->
-        raise err
-      {:error, _} = error ->
+      {:error, %Postgrex.Error{}} = error ->
         error
+      {:error, err} ->
+        raise err
     end
   end
 
@@ -152,6 +154,10 @@ defmodule Postgrex do
   string. To execute the query call `execute/4`. To close the prepared query
   call `close/3`. See `Postgrex.Query` for the query data.
 
+  This function may still raise an exception if there is an issue with types
+  (`ArgumentError`), connection (`DBConnection.ConnectionError`), ownership
+  (`DBConnection.OwnershipError`) or other error (`RuntimeError`).
+
   ## Options
 
     * `:pool_timeout` - Time to wait in the queue for the connection
@@ -170,7 +176,7 @@ defmodule Postgrex do
 
   ## Examples
 
-      Postgrex.prepare(conn, "CREATE TABLE posts (id serial, title text)")
+      Postgrex.prepare(conn, "", "CREATE TABLE posts (id serial, title text)")
   """
   @spec prepare(conn, iodata, iodata, Keyword.t) :: {:ok, Postgrex.Query.t} | {:error, Postgrex.Error.t}
   def prepare(conn, name, statement, opts \\ []) do
@@ -180,12 +186,12 @@ defmodule Postgrex do
       |> defaults()
       |> Keyword.put(:function, :prepare)
     case DBConnection.prepare(conn, query, opts) do
-      {:error, %ArgumentError{} = err} ->
+      {:ok, _} = ok ->
+        ok
+      {:error, %Postgrex.Error{}} = error ->
+        error
+      {:error, err} ->
         raise err
-      {:error, %RuntimeError{} = err} ->
-        raise err
-      other ->
-        other
     end
   end
 
@@ -210,6 +216,10 @@ defmodule Postgrex do
   values by default. See `Postgrex.Query` for the query data and
   `Postgrex.Result` for the result data.
 
+  This function may still raise an exception if there is an issue with types
+  (`ArgumentError`), connection (`DBConnection.ConnectionError`), ownership
+  (`DBConnection.OwnershipError`) or other error (`RuntimeError`).
+
   ## Options
 
     * `:pool_timeout` - Time to wait in the queue for the connection
@@ -225,22 +235,22 @@ defmodule Postgrex do
 
   ## Examples
 
-      query = Postgrex.prepare!(conn, "CREATE TABLE posts (id serial, title text)")
+      query = Postgrex.prepare!(conn, "", "CREATE TABLE posts (id serial, title text)")
       Postgrex.execute(conn, query, [])
 
-      query = Postgrex.prepare!(conn, "SELECT id FROM posts WHERE title like $1")
+      query = Postgrex.prepare!(conn, "", "SELECT id FROM posts WHERE title like $1")
       Postgrex.execute(conn, query, ["%my%"])
   """
   @spec execute(conn, Postgrex.Query.t, list, Keyword.t) ::
     {:ok, Postgrex.Result.t} | {:error, Postgrex.Error.t}
   def execute(conn, query, params, opts \\ []) do
     case DBConnection.execute(conn, query, params, defaults(opts)) do
-      {:error, %ArgumentError{} = err} ->
+      {:ok, _} = ok ->
+        ok
+      {:error, %Postgrex.Error{}} = error ->
+        error
+      {:error, err} ->
         raise err
-      {:error, %RuntimeError{} = err} ->
-        raise err
-      other ->
-        other
     end
   end
 
@@ -259,6 +269,10 @@ defmodule Postgrex do
   any resources held by postgresql for a prepared query with that name. See
   `Postgrex.Query` for the query data.
 
+  This function may still raise an exception if there is an issue with types
+  (`ArgumentError`), connection (`DBConnection.ConnectionError`), ownership
+  (`DBConnection.OwnershipError`) or other error (`RuntimeError`).
+
   ## Options
 
     * `:pool_timeout` - Time to wait in the queue for the connection
@@ -272,7 +286,7 @@ defmodule Postgrex do
 
   ## Examples
 
-      query = Postgrex.prepare!(conn, "CREATE TABLE posts (id serial, title text)")
+      query = Postgrex.prepare!(conn, "", "CREATE TABLE posts (id serial, title text)")
       Postgrex.close(conn, query)
   """
   @spec close(conn, Postgrex.Query.t, Keyword.t) :: :ok | {:error, Postgrex.Error.t}
@@ -280,12 +294,10 @@ defmodule Postgrex do
     case DBConnection.close(conn, query, defaults(opts)) do
       {:ok, _} ->
         :ok
-      {:error, %ArgumentError{} = err} ->
-        raise err
-      {:error, %RuntimeError{} = err} ->
-        raise err
-      {:error, _} = error ->
+      {:error, %Postgrex.Error{}} = error ->
         error
+      {:error, err} ->
+        raise err
     end
   end
 
